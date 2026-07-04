@@ -2,12 +2,15 @@ import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { useSelector } from "react-redux";
 import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { loginUser } from "../features/auth/authSlice";
+import { getIdentifierPayload } from "../utils/authIdentifier";
 
 function Login() {
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ identifier: "", password: "" });
   const dispatch = useDispatch();
+  const location = useLocation();
   const navigate = useNavigate();
   const { loading, error } = useSelector((state) => state.auth);
 
@@ -17,7 +20,11 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const result = await dispatch(loginUser(form));
+    const loginPayload = {
+      password: form.password,
+      ...getIdentifierPayload(form.identifier.trim()),
+    };
+    const result = await dispatch(loginUser(loginPayload));
     const authPayload = Array.isArray(result.payload) ? result.payload[0] : result.payload;
 
     if (authPayload?.token) {
@@ -39,18 +46,20 @@ function Login() {
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-heading">
             <h2>Log in</h2>
-            <p>Use your account email and password.</p>
+            <p>Use your account email or mobile and password.</p>
           </div>
 
+          {location.state?.message && <p className="auth-success">{location.state.message}</p>}
           {error && <p className="auth-error">{error}</p>}
 
           <label className="field-group">
-            <span>Email</span>
+            <span>Email or mobile</span>
             <input
-              name="email"
-              type="email"
-              placeholder="you@example.com"
-              autoComplete="email"
+              name="identifier"
+              type="text"
+              placeholder="you@example.com or 9876543210"
+              autoComplete="username"
+              value={form.identifier}
               onChange={handleChange}
               required
             />

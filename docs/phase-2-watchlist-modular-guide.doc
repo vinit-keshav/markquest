@@ -1,0 +1,375 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Phase 2 Watchlist Modular Guide</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.45; color: #111827; }
+    h1, h2, h3 { color: #0f172a; }
+    pre { background: #f3f4f6; padding: 12px; border: 1px solid #d1d5db; white-space: pre-wrap; }
+    code { font-family: Consolas, monospace; }
+    .path { font-weight: bold; color: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <h1>Phase 2 Learning Task: Watchlist</h1>
+  <p><b>Goal:</b> Learn Spring Boot APIs and React by building a small Watchlist module.</p>
+  <p><b>Do this by typing yourself.</b> This guide only tells you where each file goes and gives simple code.</p>
+
+  <h2>What You Are Building</h2>
+  <ul>
+    <li><b>POST</b> add a stock to watchlist</li>
+    <li><b>GET</b> show all watchlist stocks</li>
+    <li><b>PUT</b> update note for a watchlist stock</li>
+  </ul>
+
+  <h2>Backend Folder Pattern</h2>
+  <p>Your auth service currently uses this modular pattern:</p>
+  <pre><code>controller
+dto
+entity
+repository
+service</code></pre>
+
+  <p>For learning, add Watchlist in the same style. You can place it in a new service later. For now, if you practice inside auth-service, create these files:</p>
+
+  <pre><code>backend/auth-service/src/main/java/com/marketquest/auth_service/
+  controller/WatchlistController.java
+  dto/WatchlistRequest.java
+  entity/WatchlistItem.java
+  repository/WatchlistRepository.java
+  service/WatchlistService.java</code></pre>
+
+  <h2>Backend Code</h2>
+
+  <h3 class="path">entity/WatchlistItem.java</h3>
+  <pre><code>package com.marketquest.auth_service.entity;
+
+import jakarta.persistence.*;
+
+@Entity
+public class WatchlistItem {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String symbol;
+    private String companyName;
+    private String note;
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getSymbol() { return symbol; }
+    public void setSymbol(String symbol) { this.symbol = symbol; }
+
+    public String getCompanyName() { return companyName; }
+    public void setCompanyName(String companyName) { this.companyName = companyName; }
+
+    public String getNote() { return note; }
+    public void setNote(String note) { this.note = note; }
+}</code></pre>
+
+  <h3 class="path">dto/WatchlistRequest.java</h3>
+  <pre><code>package com.marketquest.auth_service.dto;
+
+public class WatchlistRequest {
+    private String symbol;
+    private String companyName;
+    private String note;
+
+    public String getSymbol() { return symbol; }
+    public void setSymbol(String symbol) { this.symbol = symbol; }
+
+    public String getCompanyName() { return companyName; }
+    public void setCompanyName(String companyName) { this.companyName = companyName; }
+
+    public String getNote() { return note; }
+    public void setNote(String note) { this.note = note; }
+}</code></pre>
+
+  <h3 class="path">repository/WatchlistRepository.java</h3>
+  <pre><code>package com.marketquest.auth_service.repository;
+
+import com.marketquest.auth_service.entity.WatchlistItem;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface WatchlistRepository extends JpaRepository&lt;WatchlistItem, Long&gt; {
+}</code></pre>
+
+  <h3 class="path">service/WatchlistService.java</h3>
+  <pre><code>package com.marketquest.auth_service.service;
+
+import com.marketquest.auth_service.dto.WatchlistRequest;
+import com.marketquest.auth_service.entity.WatchlistItem;
+import com.marketquest.auth_service.repository.WatchlistRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class WatchlistService {
+    private final WatchlistRepository watchlistRepository;
+
+    public WatchlistService(WatchlistRepository watchlistRepository) {
+        this.watchlistRepository = watchlistRepository;
+    }
+
+    public List&lt;WatchlistItem&gt; getAllStocks() {
+        return watchlistRepository.findAll();
+    }
+
+    public WatchlistItem addStock(WatchlistRequest request) {
+        WatchlistItem item = new WatchlistItem();
+        item.setSymbol(request.getSymbol());
+        item.setCompanyName(request.getCompanyName());
+        item.setNote(request.getNote());
+        return watchlistRepository.save(item);
+    }
+
+    public WatchlistItem updateNote(Long id, WatchlistRequest request) {
+        WatchlistItem item = watchlistRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Stock not found"));
+
+        item.setNote(request.getNote());
+        return watchlistRepository.save(item);
+    }
+}</code></pre>
+
+  <h3 class="path">controller/WatchlistController.java</h3>
+  <pre><code>package com.marketquest.auth_service.controller;
+
+import com.marketquest.auth_service.dto.WatchlistRequest;
+import com.marketquest.auth_service.entity.WatchlistItem;
+import com.marketquest.auth_service.service.WatchlistService;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/watchlist")
+@CrossOrigin(origins = "*")
+public class WatchlistController {
+    private final WatchlistService watchlistService;
+
+    public WatchlistController(WatchlistService watchlistService) {
+        this.watchlistService = watchlistService;
+    }
+
+    @GetMapping
+    public List&lt;WatchlistItem&gt; getAllStocks() {
+        return watchlistService.getAllStocks();
+    }
+
+    @PostMapping
+    public WatchlistItem addStock(@RequestBody WatchlistRequest request) {
+        return watchlistService.addStock(request);
+    }
+
+    @PutMapping("/{id}")
+    public WatchlistItem updateNote(@PathVariable Long id, @RequestBody WatchlistRequest request) {
+        return watchlistService.updateNote(id, request);
+    }
+}</code></pre>
+
+  <h2>Frontend Folder Pattern</h2>
+  <p>Your frontend currently uses:</p>
+  <pre><code>frontendr/src/api
+frontendr/src/features
+frontendr/src/pages
+frontendr/src/routes</code></pre>
+
+  <p>Create these files:</p>
+  <pre><code>frontendr/src/api/watchlistApi.js
+frontendr/src/features/watchlist/watchlistSlice.js
+frontendr/src/pages/Watchlist.jsx</code></pre>
+
+  <p>Then update this existing file:</p>
+  <pre><code>frontendr/src/routes/AppRoutes.jsx</code></pre>
+
+  <h2>Frontend Code</h2>
+
+  <h3 class="path">api/watchlistApi.js</h3>
+  <pre><code>import apiClient from "./apiClient";
+
+export const getWatchlistApi = () => {
+  return apiClient.get("/watchlist");
+};
+
+export const addWatchlistApi = (data) => {
+  return apiClient.post("/watchlist", data);
+};
+
+export const updateWatchlistNoteApi = (id, data) => {
+  return apiClient.put(`/watchlist/${id}`, data);
+};</code></pre>
+
+  <h3 class="path">features/watchlist/watchlistSlice.js</h3>
+  <pre><code>import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import {
+  addWatchlistApi,
+  getWatchlistApi,
+  updateWatchlistNoteApi,
+} from "../../api/watchlistApi";
+
+export const fetchWatchlist = createAsyncThunk("watchlist/fetch", async () => {
+  const response = await getWatchlistApi();
+  return response.data;
+});
+
+export const addWatchlistStock = createAsyncThunk("watchlist/add", async (data) => {
+  const response = await addWatchlistApi(data);
+  return response.data;
+});
+
+export const updateWatchlistNote = createAsyncThunk("watchlist/updateNote", async ({ id, note }) => {
+  const response = await updateWatchlistNoteApi(id, { note });
+  return response.data;
+});
+
+const watchlistSlice = createSlice({
+  name: "watchlist",
+  initialState: {
+    items: [],
+    loading: false,
+    error: null,
+  },
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchWatchlist.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchWatchlist.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload;
+      })
+      .addCase(fetchWatchlist.rejected, (state) => {
+        state.loading = false;
+        state.error = "Failed to load watchlist";
+      })
+      .addCase(addWatchlistStock.fulfilled, (state, action) => {
+        state.items.push(action.payload);
+      })
+      .addCase(updateWatchlistNote.fulfilled, (state, action) => {
+        const index = state.items.findIndex((item) => item.id === action.payload.id);
+        if (index !== -1) {
+          state.items[index] = action.payload;
+        }
+      });
+  },
+});
+
+export default watchlistSlice.reducer;</code></pre>
+
+  <h3 class="path">store/store.js</h3>
+  <p>Add watchlist reducer inside existing reducer object.</p>
+  <pre><code>import watchlistReducer from "../features/watchlist/watchlistSlice";
+
+// inside configureStore reducer:
+watchlist: watchlistReducer,</code></pre>
+
+  <h3 class="path">pages/Watchlist.jsx</h3>
+  <pre><code>import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  addWatchlistStock,
+  fetchWatchlist,
+  updateWatchlistNote,
+} from "../features/watchlist/watchlistSlice";
+
+const Watchlist = () => {
+  const dispatch = useDispatch();
+  const { items, loading, error } = useSelector((state) => state.watchlist);
+  const [form, setForm] = useState({
+    symbol: "",
+    companyName: "",
+    note: "",
+  });
+
+  useEffect(() => {
+    dispatch(fetchWatchlist());
+  }, [dispatch]);
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await dispatch(addWatchlistStock(form));
+    setForm({ symbol: "", companyName: "", note: "" });
+  };
+
+  const handleUpdateNote = (id) => {
+    const note = prompt("Enter new note");
+    if (note) {
+      dispatch(updateWatchlistNote({ id, note }));
+    }
+  };
+
+  return (
+    &lt;main&gt;
+      &lt;h1&gt;Watchlist&lt;/h1&gt;
+
+      &lt;form onSubmit={handleSubmit}&gt;
+        &lt;input name="symbol" placeholder="TCS" value={form.symbol} onChange={handleChange} required /&gt;
+        &lt;input name="companyName" placeholder="Company name" value={form.companyName} onChange={handleChange} required /&gt;
+        &lt;input name="note" placeholder="My note" value={form.note} onChange={handleChange} /&gt;
+        &lt;button type="submit"&gt;Add&lt;/button&gt;
+      &lt;/form&gt;
+
+      {loading && &lt;p&gt;Loading...&lt;/p&gt;}
+      {error && &lt;p&gt;{error}&lt;/p&gt;}
+
+      &lt;ul&gt;
+        {items.map((item) =&gt; (
+          &lt;li key={item.id}&gt;
+            &lt;strong&gt;{item.symbol}&lt;/strong&gt; - {item.companyName}
+            &lt;p&gt;{item.note}&lt;/p&gt;
+            &lt;button onClick={() =&gt; handleUpdateNote(item.id)}&gt;Update Note&lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/main&gt;
+  );
+};
+
+export default Watchlist;</code></pre>
+
+  <h3 class="path">routes/AppRoutes.jsx</h3>
+  <p>Add import:</p>
+  <pre><code>import Watchlist from "../pages/Watchlist";</code></pre>
+  <p>Add route:</p>
+  <pre><code>&lt;Route path="/watchlist" element={&lt;ProtectedRoute&gt;&lt;Watchlist /&gt;&lt;/ProtectedRoute&gt;} /&gt;</code></pre>
+
+  <h2>Testing Order</h2>
+  <ol>
+    <li>First create backend files.</li>
+    <li>Run backend.</li>
+    <li>Test APIs in Postman.</li>
+    <li>Then create frontend files.</li>
+    <li>Add reducer to store.</li>
+    <li>Add route.</li>
+    <li>Open <code>/watchlist</code> after login.</li>
+  </ol>
+
+  <h2>Postman Examples</h2>
+  <h3>POST http://localhost:8081/api/watchlist</h3>
+  <pre><code>{
+  "symbol": "TCS",
+  "companyName": "Tata Consultancy Services",
+  "note": "Track this IT stock"
+}</code></pre>
+
+  <h3>GET http://localhost:8081/api/watchlist</h3>
+  <pre><code>No request body.</code></pre>
+
+  <h3>PUT http://localhost:8081/api/watchlist/1</h3>
+  <pre><code>{
+  "note": "Updated note"
+}</code></pre>
+
+  <h2>Important Learning Point</h2>
+  <p>Controller receives HTTP request. Service contains business logic. Repository talks to database. React page displays UI. API file talks to backend. Redux slice stores frontend data.</p>
+</body>
+</html>

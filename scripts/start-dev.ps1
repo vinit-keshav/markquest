@@ -1,0 +1,60 @@
+$ErrorActionPreference = "Stop"
+
+$root = Split-Path -Parent $PSScriptRoot
+$composeFile = Join-Path $root "backend\docker-compose.yml"
+$logDir = Join-Path $root "tmp\dev-logs"
+$pidDir = Join-Path $root "tmp\dev-pids"
+
+New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+New-Item -ItemType Directory -Force -Path $pidDir | Out-Null
+
+function Start-SpringService {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string] $Name,
+
+        [Parameter(Mandatory = $true)]
+        [string] $ServicePath
+    )
+
+    $logFile = Join-Path $logDir "$Name.log"
+    $pidFile = Join-Path $pidDir "$Name.pid"
+    $escapedServicePath = $ServicePath.Replace("'", "''")
+    $escapedLogFile = $logFile.Replace("'", "''")
+    $command = "Set-Location -LiteralPath '$escapedServicePath'; .\mvnw.cmd spring-boot:run *> '$escapedLogFile'"
+
+    if (Test-Path $pidFile) {
+        $existingPid = Get-Content $pidFile -ErrorAction SilentlyContinue
+        if ($existingPid -and (Get-Process -Id $existingPid -ErrorAction SilentlyContinue)) {
+            Write-Host "$Name is already running with PID $existingPid"
+            return
+        }
+    }
+
+    $process = Start-Process `
+        -FilePath "powershell.exe" `
+        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $command) `
+        -WindowStyle Hidden `
+        -PassThru
+
+    Set-Content -Path $pidFile -Value $process.Id
+    Write-Host "Started $Name with PID $($process.Id)"
+    Write-Host "Log: $logFile"
+}
+
+Write-Host "Starting Kafka and Zookeeper..."
+docker compose -f $composeFile up -d
+
+Start-SpringService `
+    -Name "notification-service" `
+    -ServicePath (Join-Path $root "backend\notification-service")
+
+Start-SpringService `
+    -Name "auth-service" `
+    -ServicePath (Join-Path $root "backend\auth-service")
+
+Write-Host ""
+Write-Host "All requested services started."
+Write-Host "Watch logs with:"
+Write-Host "  Get-Content -Wait tmp\dev-logs\notification-service.log"
+Write-Host "  Get-Content -Wait tmp\dev-logs\auth-service.log"

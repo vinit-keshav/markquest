@@ -1,0 +1,232 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Phase 2 Learning Task - Watchlist API and React</title>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.45; color: #111827; }
+    h1, h2 { color: #0f172a; }
+    pre { background: #f3f4f6; padding: 12px; border: 1px solid #d1d5db; white-space: pre-wrap; }
+    code { font-family: Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <h1>Phase 2: Small Learning Task</h1>
+  <p><b>Task:</b> Build a simple Watchlist feature.</p>
+  <p>This is a small beginner task from the MarketQuest AI blueprint. Do not worry about database or perfect design first. Learn API + React flow.</p>
+
+  <h2>What You Will Practice</h2>
+  <ul>
+    <li>POST API: add stock to watchlist</li>
+    <li>GET API: show watchlist</li>
+    <li>PUT API: update note for a stock</li>
+    <li>React form, button click, state, useEffect, fetch</li>
+  </ul>
+
+  <h2>Backend: Simple Spring Boot Code</h2>
+  <p>Create these files in a practice service later. This version uses memory only, so data resets when backend restarts.</p>
+
+  <h3>WatchlistItem.java</h3>
+  <pre><code>package com.marketquest.watchlist;
+
+public class WatchlistItem {
+    private Long id;
+    private String symbol;
+    private String companyName;
+    private String note;
+
+    public WatchlistItem() {
+    }
+
+    public WatchlistItem(Long id, String symbol, String companyName, String note) {
+        this.id = id;
+        this.symbol = symbol;
+        this.companyName = companyName;
+        this.note = note;
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getSymbol() { return symbol; }
+    public void setSymbol(String symbol) { this.symbol = symbol; }
+
+    public String getCompanyName() { return companyName; }
+    public void setCompanyName(String companyName) { this.companyName = companyName; }
+
+    public String getNote() { return note; }
+    public void setNote(String note) { this.note = note; }
+}</code></pre>
+
+  <h3>WatchlistController.java</h3>
+  <pre><code>package com.marketquest.watchlist;
+
+import org.springframework.web.bind.annotation.*;
+import java.util.ArrayList;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/watchlist")
+@CrossOrigin(origins = "*")
+public class WatchlistController {
+    private final List&lt;WatchlistItem&gt; watchlist = new ArrayList&lt;&gt;();
+    private Long nextId = 1L;
+
+    @GetMapping
+    public List&lt;WatchlistItem&gt; getWatchlist() {
+        return watchlist;
+    }
+
+    @PostMapping
+    public WatchlistItem addStock(@RequestBody WatchlistItem request) {
+        WatchlistItem item = new WatchlistItem(
+                nextId++,
+                request.getSymbol(),
+                request.getCompanyName(),
+                request.getNote()
+        );
+        watchlist.add(item);
+        return item;
+    }
+
+    @PutMapping("/{id}")
+    public WatchlistItem updateNote(@PathVariable Long id, @RequestBody WatchlistItem request) {
+        for (WatchlistItem item : watchlist) {
+            if (item.getId().equals(id)) {
+                item.setNote(request.getNote());
+                return item;
+            }
+        }
+        throw new RuntimeException("Stock not found in watchlist");
+    }
+}</code></pre>
+
+  <h2>Frontend: Simple React Code</h2>
+  <p>Create this as a practice component later, for example <code>WatchlistPractice.jsx</code>.</p>
+
+  <pre><code>import { useEffect, useState } from "react";
+
+const API_URL = "http://localhost:8082/api/watchlist";
+
+function WatchlistPractice() {
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({
+    symbol: "",
+    companyName: "",
+    note: "",
+  });
+
+  const loadWatchlist = async () => {
+    const response = await fetch(API_URL);
+    const data = await response.json();
+    setItems(data);
+  };
+
+  useEffect(() => {
+    loadWatchlist();
+  }, []);
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const addStock = async (e) => {
+    e.preventDefault();
+
+    await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+
+    setForm({ symbol: "", companyName: "", note: "" });
+    loadWatchlist();
+  };
+
+  const updateNote = async (id) => {
+    const note = prompt("Enter new note");
+    if (!note) return;
+
+    await fetch(`${API_URL}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note }),
+    });
+
+    loadWatchlist();
+  };
+
+  return (
+    &lt;div&gt;
+      &lt;h2&gt;My Watchlist&lt;/h2&gt;
+
+      &lt;form onSubmit={addStock}&gt;
+        &lt;input
+          name="symbol"
+          placeholder="Symbol, example TCS"
+          value={form.symbol}
+          onChange={handleChange}
+        /&gt;
+
+        &lt;input
+          name="companyName"
+          placeholder="Company name"
+          value={form.companyName}
+          onChange={handleChange}
+        /&gt;
+
+        &lt;input
+          name="note"
+          placeholder="Why are you watching this?"
+          value={form.note}
+          onChange={handleChange}
+        /&gt;
+
+        &lt;button type="submit"&gt;Add Stock&lt;/button&gt;
+      &lt;/form&gt;
+
+      &lt;ul&gt;
+        {items.map((item) =&gt; (
+          &lt;li key={item.id}&gt;
+            &lt;b&gt;{item.symbol}&lt;/b&gt; - {item.companyName}
+            &lt;p&gt;{item.note}&lt;/p&gt;
+            &lt;button onClick={() =&gt; updateNote(item.id)}&gt;
+              Update Note
+            &lt;/button&gt;
+          &lt;/li&gt;
+        ))}
+      &lt;/ul&gt;
+    &lt;/div&gt;
+  );
+}
+
+export default WatchlistPractice;</code></pre>
+
+  <h2>Your Learning Steps</h2>
+  <ol>
+    <li>First understand the backend controller.</li>
+    <li>Test GET, POST, and PUT using Postman.</li>
+    <li>Then connect the React component.</li>
+    <li>Do not focus on design yet.</li>
+    <li>After it works, ask for optimization and styling.</li>
+  </ol>
+
+  <h2>Example API Requests</h2>
+  <h3>POST /api/watchlist</h3>
+  <pre><code>{
+  "symbol": "TCS",
+  "companyName": "Tata Consultancy Services",
+  "note": "I want to track IT stocks"
+}</code></pre>
+
+  <h3>GET /api/watchlist</h3>
+  <pre><code>No body needed.</code></pre>
+
+  <h3>PUT /api/watchlist/1</h3>
+  <pre><code>{
+  "note": "Updated note after reading company news"
+}</code></pre>
+
+  <h2>Keep It Simple</h2>
+  <p>Your goal is not production code yet. Your goal is to understand request, controller, response, React state, and re-rendering.</p>
+</body>
+</html>

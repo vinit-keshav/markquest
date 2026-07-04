@@ -1,14 +1,47 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { loginApi, signupApi } from "../../api/authApi";
+import { loginApi, resendOtpApi, signupApi, verifyOtpApi } from "../../api/authApi";
 
-export const signupUser = createAsyncThunk("auth/signup", async (data) => {
-  const response = await signupApi(data);
-  return response.data;
+const getApiError = (error, fallback) => {
+  const data = error.response?.data;
+  if (typeof data === "string" && data.trim()) return data;
+  if (typeof data?.message === "string" && data.message.trim()) return data.message;
+  return fallback;
+};
+
+export const signupUser = createAsyncThunk("auth/signup", async (data, { rejectWithValue }) => {
+  try {
+    const response = await signupApi(data);
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(getApiError(error, "Signup failed"));
+  }
 });
 
-export const loginUser = createAsyncThunk("auth/login", async (data) => {
-  const response = await loginApi(data);
-  return response.data;
+export const loginUser = createAsyncThunk("auth/login", async (data, { rejectWithValue }) => {
+  try {
+    const response = await loginApi(data);
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(getApiError(error, "Login failed"));
+  }
+});
+
+export const verifyOtpUser = createAsyncThunk("auth/verifyOtp", async (data, { rejectWithValue }) => {
+  try {
+    const response = await verifyOtpApi(data);
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(getApiError(error, "OTP verification failed"));
+  }
+});
+
+export const resendOtpUser = createAsyncThunk("auth/resendOtp", async (data, { rejectWithValue }) => {
+  try {
+    const response = await resendOtpApi(data);
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(getApiError(error, "OTP resend failed"));
+  }
 });
 
 const authSlice = createSlice({
@@ -37,15 +70,19 @@ const authSlice = createSlice({
 
         state.loading = false;
         state.token = authPayload?.token || null;
-        state.user = { name: authPayload?.name, email: authPayload?.email };
+        state.user = {
+          name: authPayload?.name,
+          email: authPayload?.email,
+          mobile: authPayload?.mobile,
+        };
 
         if (authPayload?.token) {
           localStorage.setItem("token", authPayload.token);
         }
       })
-      .addCase(loginUser.rejected, (state) => {
+      .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = "Login failed";
+        state.error = action.payload || "Login failed";
       })
       .addCase(signupUser.pending, (state) => {
         state.loading = true;
@@ -54,9 +91,31 @@ const authSlice = createSlice({
       .addCase(signupUser.fulfilled, (state) => {
         state.loading = false;
       })
-      .addCase(signupUser.rejected, (state) => {
+      .addCase(signupUser.rejected, (state, action) => {
         state.loading = false;
-        state.error = "Signup failed";
+        state.error = action.payload || "Signup failed";
+      })
+      .addCase(verifyOtpUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(verifyOtpUser.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(verifyOtpUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "OTP verification failed";
+      })
+      .addCase(resendOtpUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(resendOtpUser.fulfilled, (state) => {
+        state.loading = false;
+      })
+      .addCase(resendOtpUser.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "OTP resend failed";
       });
   },
 });
