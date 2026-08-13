@@ -37,16 +37,16 @@ function Login() {
       <section className="auth-shell" aria-label="Login">
         <div className="auth-intro">
           <p className="brand-mark">MarketQuest AI</p>
-          <h1>Welcome back</h1>
+          <h1>Access your trading workspace</h1>
           <p className="auth-copy">
-            Continue your virtual investing practice, track portfolio progress, and build market confidence.
+            Review watchlists, manage paper positions, and evaluate decisions with real market context.
           </p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-heading">
-            <h2>Log in</h2>
-            <p>Use your account email or mobile and password.</p>
+            <h2>Sign in</h2>
+            <p>Use your registered email or mobile number.</p>
           </div>
 
           {location.state?.message && <p className="auth-success">{location.state.message}</p>}
@@ -78,7 +78,7 @@ function Login() {
           </label>
 
           <button className="primary-action" type="submit" disabled={loading}>
-            {loading ? "Logging in..." : "Log in"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
 
           <p className="auth-switch">

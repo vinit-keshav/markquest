@@ -1,0 +1,15 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: trading-service
+  kafka:
+    bootstrap-servers: localhost:9092
+
+marketquest:
+  market-data:
+    finnhub-token: ${FINNHUB_TOKEN:}
+  kafka:
+    topic:
+      trade-executed: trade.executed

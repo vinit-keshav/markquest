@@ -42,16 +42,16 @@ const Signup = () => {
       <section className="auth-shell" aria-label="Signup">
         <div className="auth-intro">
           <p className="brand-mark">MarketQuest AI</p>
-          <h1>Start learning by trading virtually</h1>
+          <h1>Practice market decisions with confidence</h1>
           <p className="auth-copy">
-            Create your account and begin with a practice portfolio built for beginner investors.
+            Create a secure workspace for paper trading, portfolio tracking, and structured market research.
           </p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-heading">
             <h2>Create account</h2>
-            <p>Enter your details to set up your workspace.</p>
+            <p>Set up your MarketQuest profile.</p>
           </div>
 
           {error && <p className="auth-error">{error}</p>}
@@ -103,7 +103,7 @@ const Signup = () => {
             />
           </label>
           <button className="primary-action" type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Create account"}
+            {loading ? "Creating account..." : "Create account"}
           </button>
 
           <p className="auth-switch">

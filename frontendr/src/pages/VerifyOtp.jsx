@@ -55,14 +55,14 @@ const VerifyOtp = () => {
           <p className="brand-mark">MarketQuest AI</p>
           <h1>Verify your account</h1>
           <p className="auth-copy">
-            Enter the one-time code sent during signup to activate your account.
+            Confirm the one-time code sent to your registered contact.
           </p>
         </div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <div className="auth-heading">
-            <h2>Enter OTP</h2>
-            <p>Use the email or mobile number from signup.</p>
+            <h2>Security verification</h2>
+            <p>Enter the code to activate your workspace.</p>
           </div>
 
           {statusMessage && <p className="auth-success">{statusMessage}</p>}

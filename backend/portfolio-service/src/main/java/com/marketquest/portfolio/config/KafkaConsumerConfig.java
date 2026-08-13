@@ -1,6 +1,6 @@
-package com.marketquest.notification_service.config;
+package com.marketquest.portfolio.config;
 
-import com.marketquest.notification_service.event.OtpRequestedEvent;
+import com.marketquest.portfolio.event.TradeExecutedEvent;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -17,15 +17,15 @@ import org.springframework.kafka.support.serializer.JsonDeserializer;
 public class KafkaConsumerConfig {
 
     @Bean
-    public ConsumerFactory<String, OtpRequestedEvent> otpConsumerFactory(
+    public ConsumerFactory<String, TradeExecutedEvent> tradeConsumerFactory(
             @Value("${spring.kafka.bootstrap-servers}") String bootstrapServers,
             @Value("${spring.kafka.consumer.group-id}") String groupId) {
-        JsonDeserializer<OtpRequestedEvent> valueDeserializer = new JsonDeserializer<>(OtpRequestedEvent.class);
+        JsonDeserializer<TradeExecutedEvent> valueDeserializer = new JsonDeserializer<>(TradeExecutedEvent.class);
         valueDeserializer.addTrustedPackages("*");
         valueDeserializer.ignoreTypeHeaders();
 
         Map<String, Object> config = new HashMap<>();
-        config. put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
@@ -34,11 +34,11 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, OtpRequestedEvent> kafkaListenerContainerFactory(
-            ConsumerFactory<String, OtpRequestedEvent> otpConsumerFactory) {
-        ConcurrentKafkaListenerContainerFactory<String, OtpRequestedEvent> factory =
+    public ConcurrentKafkaListenerContainerFactory<String, TradeExecutedEvent> kafkaListenerContainerFactory(
+            ConsumerFactory<String, TradeExecutedEvent> tradeConsumerFactory) {
+        ConcurrentKafkaListenerContainerFactory<String, TradeExecutedEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(otpConsumerFactory);
+        factory.setConsumerFactory(tradeConsumerFactory);
         return factory;
     }
 }

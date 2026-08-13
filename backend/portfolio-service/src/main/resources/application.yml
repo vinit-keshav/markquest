@@ -1,0 +1,26 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: portfolio-service
+  datasource:
+    url: jdbc:mysql://localhost:3307/marketquest_auth
+    username: marketquest_user
+    password: MarketQuest@123
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: portfolio-service
+
+marketquest:
+  kafka:
+    topic:
+      trade-executed: trade.executed

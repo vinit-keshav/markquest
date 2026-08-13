@@ -44,8 +44,8 @@ const Watchlist = () => {
       <header className="watchlist-header">
         <div>
           <p className="eyebrow">MarketQuest AI</p>
-          <h1>Watchlist</h1>
-          <p>Track companies and keep short research notes.</p>
+          <h1>Research Watchlist</h1>
+          <p>Organize companies you want to follow and keep concise investment notes.</p>
         </div>
         <Link className="secondary-action" to="/dashboard">Dashboard</Link>
       </header>
@@ -72,13 +72,13 @@ const Watchlist = () => {
           />
         </label>
         <button className="primary-action" type="submit" disabled={loading}>
-          Add stock
+          Add to watchlist
         </button>
       </form>
 
       {error && <p className="auth-error">{error}</p>}
       {loading && items.length === 0 && <p>Loading watchlist...</p>}
-      {!loading && items.length === 0 && <p className="empty-state">No stocks added yet.</p>}
+      {!loading && items.length === 0 && <p className="empty-state">Your watchlist is empty.</p>}
 
       <section className="watchlist-grid" aria-label="Watched stocks">
         {items.map((item) => (
@@ -97,7 +97,7 @@ const Watchlist = () => {
                     [item.id]: event.target.value,
                   }))
                 }
-                placeholder="Why are you watching this stock?"
+                placeholder="Key thesis, trigger, or risk"
                 rows={3}
               />
             </label>

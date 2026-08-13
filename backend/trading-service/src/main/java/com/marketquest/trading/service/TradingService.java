@@ -1,0 +1,80 @@
+package com.marketquest.trading.service;
+
+import com.marketquest.trading.dto.TradeRequest;
+import com.marketquest.trading.dto.TradeResponse;
+import com.marketquest.trading.event.TradeEventProducer;
+import com.marketquest.trading.event.TradeExecutedEvent;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.Locale;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+
+@Service
+public class TradingService {
+    private final TradeEventProducer tradeEventProducer;
+    private final InstrumentService instrumentService;
+    private final LivePriceService livePriceService;
+
+    public TradingService(
+            TradeEventProducer tradeEventProducer,
+            InstrumentService instrumentService,
+            LivePriceService livePriceService) {
+        this.tradeEventProducer = tradeEventProducer;
+        this.instrumentService = instrumentService;
+        this.livePriceService = livePriceService;
+    }
+
+    public TradeResponse executeTrade(TradeRequest request) {
+        validate(request);
+        BigDecimal executionPrice = livePriceService
+                .getPrice(instrumentService.findBySymbol(request.getSymbol()))
+                .getPrice();
+
+        String tradeId = UUID.randomUUID().toString();
+        TradeExecutedEvent event = new TradeExecutedEvent(
+                tradeId,
+                request.getUserId().trim(),
+                request.getSymbol().trim().toUpperCase(Locale.ROOT),
+                request.getSide().trim().toUpperCase(Locale.ROOT),
+                request.getQuantity(),
+                executionPrice,
+                normalizeCurrency(request.getCurrency()),
+                Instant.now());
+
+        tradeEventProducer.publishTradeExecuted(event);
+        return new TradeResponse(tradeId, "EXECUTED", "Trade executed and published");
+    }
+
+    private void validate(TradeRequest request) {
+        if (request.getUserId() == null || request.getUserId().isBlank()) {
+            throw new IllegalArgumentException("userId is required");
+        }
+        if (request.getSymbol() == null || request.getSymbol().isBlank()) {
+            throw new IllegalArgumentException("symbol is required");
+        }
+        if (!instrumentService.exists(request.getSymbol())) {
+            throw new IllegalArgumentException("symbol is not available in the demo market list");
+        }
+        if (request.getSide() == null || request.getSide().isBlank()) {
+            throw new IllegalArgumentException("side is required");
+        }
+        String side = request.getSide().trim().toUpperCase(Locale.ROOT);
+        if (!side.equals("BUY") && !side.equals("SELL")) {
+            throw new IllegalArgumentException("side must be BUY or SELL");
+        }
+        if (request.getQuantity() <= 0) {
+            throw new IllegalArgumentException("quantity must be greater than zero");
+        }
+        if (request.getPrice() == null || request.getPrice().signum() <= 0) {
+            throw new IllegalArgumentException("price must be greater than zero");
+        }
+    }
+
+    private String normalizeCurrency(String currency) {
+        if (currency == null || currency.isBlank()) {
+            return "INR";
+        }
+        return currency.trim().toUpperCase(Locale.ROOT);
+    }
+}
