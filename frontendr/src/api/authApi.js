@@ -17,3 +17,7 @@ export const verifyOtpApi = (otpData) => {
 export const resendOtpApi = (otpData) => {
   return apiClient.post("/auth/resend-otp", otpData);
 };
+
+export const resetPasswordApi = (data) => {
+  return apiClient.post("/auth/reset-password", data);
+};

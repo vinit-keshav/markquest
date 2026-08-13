@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { loginApi, resendOtpApi, signupApi, verifyOtpApi } from "../../api/authApi";
+import { loginApi, resendOtpApi, resetPasswordApi, signupApi, verifyOtpApi } from "../../api/authApi";
 
 const getApiError = (error, fallback) => {
   const data = error.response?.data;
@@ -44,11 +44,20 @@ export const resendOtpUser = createAsyncThunk("auth/resendOtp", async (data, { r
   }
 });
 
+export const resetPasswordUser = createAsyncThunk("auth/resetPassword", async (data, { rejectWithValue }) => {
+  try {
+    const response = await resetPasswordApi(data);
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(getApiError(error, "Password update failed"));
+  }
+});
+
 const authSlice = createSlice({
   name: "auth",
   initialState: {
     token: localStorage.getItem("token") || null,
-    user: null,
+    user: JSON.parse(localStorage.getItem("user") || "null"),
     loading: false,
     error: null,
   },
@@ -57,6 +66,7 @@ const authSlice = createSlice({
       state.token = null;
       state.user = null;
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
     },
   },
   extraReducers: (builder) => {
@@ -74,10 +84,12 @@ const authSlice = createSlice({
           name: authPayload?.name,
           email: authPayload?.email,
           mobile: authPayload?.mobile,
+          filename: authPayload?.filename,
         };
 
         if (authPayload?.token) {
           localStorage.setItem("token", authPayload.token);
+          localStorage.setItem("user", JSON.stringify(state.user));
         }
       })
       .addCase(loginUser.rejected, (state, action) => {
