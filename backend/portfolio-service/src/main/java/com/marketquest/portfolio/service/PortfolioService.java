@@ -1,6 +1,7 @@
 package com.marketquest.portfolio.service;
 
 import com.marketquest.portfolio.dto.AccountResponse;
+import com.marketquest.portfolio.dto.DailyProfitLossResponse;
 import com.marketquest.portfolio.dto.HoldingResponse;
 import com.marketquest.portfolio.dto.PortfolioSummaryResponse;
 import com.marketquest.portfolio.dto.TradeHistoryResponse;
@@ -14,8 +15,12 @@ import com.marketquest.portfolio.repository.DemoTradeRepository;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -52,7 +57,7 @@ public class PortfolioService {
         ensureDefaultAccounts(userId);
 
         if (quantity <= 0 || price == null || price.signum() <= 0) {
-            saveTrade(event, symbol, side, currency, "REJECTED", "Invalid quantity or price");
+            saveTrade(event, symbol, side, currency, "REJECTED", BigDecimal.ZERO, "Invalid quantity or price");
             return;
         }
 
@@ -66,7 +71,7 @@ public class PortfolioService {
             return;
         }
 
-        saveTrade(event, symbol, side, currency, "REJECTED", "Side must be BUY or SELL");
+        saveTrade(event, symbol, side, currency, "REJECTED", BigDecimal.ZERO, "Side must be BUY or SELL");
     }
 
     @Transactional
@@ -117,11 +122,12 @@ public class PortfolioService {
                         trade.getPrice(),
                         trade.getCurrency(),
                         trade.getStatus(),
+                        trade.getProfitLoss(),
                         trade.getMessage(),
                         trade.getExecutedAt()))
                 .toList();
 
-        return new PortfolioSummaryResponse(accounts, getHoldings(normalizedUserId), trades);
+        return new PortfolioSummaryResponse(accounts, getHoldings(normalizedUserId), trades, getDailyProfitLoss(normalizedUserId));
     }
 
     @Transactional
@@ -152,7 +158,7 @@ public class PortfolioService {
         BigDecimal tradeValue = price.multiply(BigDecimal.valueOf(quantity));
 
         if (account.getCashBalance().compareTo(tradeValue) < 0) {
-            saveTrade(event, symbol, "BUY", currency, "REJECTED", "Insufficient demo cash");
+            saveTrade(event, symbol, "BUY", currency, "REJECTED", BigDecimal.ZERO, "Insufficient demo cash");
             return;
         }
 
@@ -165,7 +171,7 @@ public class PortfolioService {
 
         accountRepository.save(account);
         holdingRepository.save(holding);
-        saveTrade(event, symbol, "BUY", currency, "EXECUTED", "Buy order executed");
+        saveTrade(event, symbol, "BUY", currency, "EXECUTED", BigDecimal.ZERO, "Buy order executed");
     }
 
     private void sell(
@@ -180,19 +186,20 @@ public class PortfolioService {
                 .orElse(null);
 
         if (holding == null || holding.getQuantity() < quantity) {
-            saveTrade(event, symbol, "SELL", currency, "REJECTED", "Insufficient holdings");
+            saveTrade(event, symbol, "SELL", currency, "REJECTED", BigDecimal.ZERO, "Insufficient holdings");
             return;
         }
 
         DemoAccount account = getAccount(userId, currency);
         BigDecimal tradeValue = price.multiply(BigDecimal.valueOf(quantity));
+        BigDecimal profitLoss = price.subtract(holding.getAveragePrice()).multiply(BigDecimal.valueOf(quantity));
 
         holding.sell(quantity, price);
         account.setCashBalance(account.getCashBalance().add(tradeValue));
 
         holdingRepository.save(holding);
         accountRepository.save(account);
-        saveTrade(event, symbol, "SELL", currency, "EXECUTED", "Sell order executed");
+        saveTrade(event, symbol, "SELL", currency, "EXECUTED", profitLoss, "Sell order executed");
     }
 
     private DemoAccount getAccount(String userId, String currency) {
@@ -220,6 +227,7 @@ public class PortfolioService {
             String side,
             String currency,
             String status,
+            BigDecimal profitLoss,
             String message) {
         DemoTrade trade = new DemoTrade(
                 event.getTradeId(),
@@ -230,9 +238,31 @@ public class PortfolioService {
                 event.getPrice() == null ? BigDecimal.ZERO : event.getPrice(),
                 currency,
                 status,
+                profitLoss == null ? BigDecimal.ZERO : profitLoss,
                 message,
                 event.getExecutedAt() == null ? Instant.now() : event.getExecutedAt());
         tradeRepository.save(trade);
+    }
+
+    private List<DailyProfitLossResponse> getDailyProfitLoss(String userId) {
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneId.systemDefault());
+        Map<String, BigDecimal> totals = new LinkedHashMap<>();
+
+        tradeRepository.findByUserIdAndStatusOrderByExecutedAtAsc(userId, "EXECUTED")
+                .stream()
+                .filter(trade -> "SELL".equalsIgnoreCase(trade.getSide()))
+                .forEach(trade -> {
+                    String key = formatter.format(trade.getExecutedAt()) + "|" + trade.getCurrency();
+                    totals.merge(key, trade.getProfitLoss(), BigDecimal::add);
+                });
+
+        return totals.entrySet()
+                .stream()
+                .map(entry -> {
+                    String[] parts = entry.getKey().split("\\|", 2);
+                    return new DailyProfitLossResponse(parts[0], parts[1], entry.getValue());
+                })
+                .toList();
     }
 
     private HoldingResponse toHoldingResponse(DemoHolding holding) {

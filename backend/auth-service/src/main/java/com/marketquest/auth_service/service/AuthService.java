@@ -159,9 +159,25 @@ public String verifyOtp(VerifyOtpRequest request){
     String token = jwtService.generateToken(tokenSubject);
 
     List<AuthResponse> authResponses = List.of(
-        new AuthResponse(token, user.getName(), user.getEmail(), user.getMobile())
+        new AuthResponse(token, user.getName(), user.getEmail(), user.getMobile(), user.getFilename())
     );
     return authResponses;
+  }
+
+  public String resetPassword(PasswordResetRequest request) {
+    User user = findByIdentifier(request.getIdentifier());
+
+    if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+        throw new RuntimeException("Current password is incorrect");
+    }
+
+    if (request.getNewPassword() == null || request.getNewPassword().length() < 6) {
+        throw new RuntimeException("New password must be at least 6 characters");
+    }
+
+    user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+    userRepository.save(user);
+    return "Password updated successfully";
   }
 
   private User findByIdentifier(String identifier) {

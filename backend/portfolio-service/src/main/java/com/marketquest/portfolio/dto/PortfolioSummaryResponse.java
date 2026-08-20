@@ -6,14 +6,17 @@ public class PortfolioSummaryResponse {
     private List<AccountResponse> accounts;
     private List<HoldingResponse> holdings;
     private List<TradeHistoryResponse> trades;
+    private List<DailyProfitLossResponse> dailyProfitLoss;
 
     public PortfolioSummaryResponse(
             List<AccountResponse> accounts,
             List<HoldingResponse> holdings,
-            List<TradeHistoryResponse> trades) {
+            List<TradeHistoryResponse> trades,
+            List<DailyProfitLossResponse> dailyProfitLoss) {
         this.accounts = accounts;
         this.holdings = holdings;
         this.trades = trades;
+        this.dailyProfitLoss = dailyProfitLoss;
     }
 
     public List<AccountResponse> getAccounts() {
@@ -26,5 +29,9 @@ public class PortfolioSummaryResponse {
 
     public List<TradeHistoryResponse> getTrades() {
         return trades;
+    }
+
+    public List<DailyProfitLossResponse> getDailyProfitLoss() {
+        return dailyProfitLoss;
     }
 }

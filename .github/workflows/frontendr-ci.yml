@@ -1,0 +1,44 @@
+name: Frontendr CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "frontendr/**"
+      - ".github/workflows/frontendr-ci.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "frontendr/**"
+      - ".github/workflows/frontendr-ci.yml"
+
+jobs:
+  build:
+    name: Lint and build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: frontendr
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontendr/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

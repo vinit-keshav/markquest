@@ -11,6 +11,7 @@ public class TradeHistoryResponse {
     private BigDecimal price;
     private String currency;
     private String status;
+    private BigDecimal profitLoss;
     private String message;
     private Instant executedAt;
 
@@ -22,6 +23,7 @@ public class TradeHistoryResponse {
             BigDecimal price,
             String currency,
             String status,
+            BigDecimal profitLoss,
             String message,
             Instant executedAt) {
         this.tradeId = tradeId;
@@ -31,6 +33,7 @@ public class TradeHistoryResponse {
         this.price = price;
         this.currency = currency;
         this.status = status;
+        this.profitLoss = profitLoss;
         this.message = message;
         this.executedAt = executedAt;
     }
@@ -61,6 +64,10 @@ public class TradeHistoryResponse {
 
     public String getStatus() {
         return status;
+    }
+
+    public BigDecimal getProfitLoss() {
+        return profitLoss;
     }
 
     public String getMessage() {

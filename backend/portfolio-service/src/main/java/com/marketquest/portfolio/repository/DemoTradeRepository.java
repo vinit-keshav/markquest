@@ -8,4 +8,6 @@ public interface DemoTradeRepository extends JpaRepository<DemoTrade, Long> {
     boolean existsByTradeId(String tradeId);
 
     List<DemoTrade> findTop20ByUserIdOrderByExecutedAtDesc(String userId);
+
+    List<DemoTrade> findByUserIdAndStatusOrderByExecutedAtAsc(String userId, String status);
 }

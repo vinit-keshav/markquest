@@ -40,6 +40,9 @@ public class DemoTrade {
     @Column(nullable = false)
     private String status;
 
+    @Column(precision = 19, scale = 4)
+    private BigDecimal profitLoss;
+
     private String message;
 
     @Column(nullable = false)
@@ -57,6 +60,7 @@ public class DemoTrade {
             BigDecimal price,
             String currency,
             String status,
+            BigDecimal profitLoss,
             String message,
             Instant executedAt) {
         this.tradeId = tradeId;
@@ -67,6 +71,7 @@ public class DemoTrade {
         this.price = price;
         this.currency = currency;
         this.status = status;
+        this.profitLoss = profitLoss;
         this.message = message;
         this.executedAt = executedAt;
     }
@@ -105,6 +110,10 @@ public class DemoTrade {
 
     public String getStatus() {
         return status;
+    }
+
+    public BigDecimal getProfitLoss() {
+        return profitLoss == null ? BigDecimal.ZERO : profitLoss;
     }
 
     public String getMessage() {
