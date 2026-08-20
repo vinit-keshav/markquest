@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   depositDemoCashApi,
@@ -121,23 +121,23 @@ const TradingLab = () => {
     return Array.from(byCurrency, ([currency, realizedProfitLoss]) => ({ currency, realizedProfitLoss }));
   }, [trades]);
 
-  const loadPortfolio = async (activeUserId = userId) => {
+  const loadPortfolio = useCallback(async (activeUserId = userId) => {
     const response = await getPortfolioSummaryApi(activeUserId.trim());
     setAccounts(response.data.accounts || []);
     setHoldings(response.data.holdings || []);
     setTrades(response.data.trades || []);
     setDailyProfitLoss(response.data.dailyProfitLoss || []);
-  };
+  }, [userId]);
 
-  const selectInstrument = (instrument) => {
+  const selectInstrument = useCallback((instrument) => {
     setSelected(instrument);
     setLiveQuote(null);
     setTradePrice(String(instrument.referencePrice));
     setMessage("");
     setError("");
-  };
+  }, []);
 
-  const loadLivePrice = async (instrument = selected, showLoader = true) => {
+  const loadLivePrice = useCallback(async (instrument = selected, showLoader = true) => {
     if (!instrument) return null;
 
     if (showLoader) setPriceLoading(true);
@@ -152,7 +152,7 @@ const TradingLab = () => {
     } finally {
       if (showLoader) setPriceLoading(false);
     }
-  };
+  }, [selected]);
 
   useEffect(() => {
     getInstrumentsApi({ market, query })
@@ -161,20 +161,40 @@ const TradingLab = () => {
         if (!selected && response.data.length > 0) selectInstrument(response.data[0]);
       })
       .catch(() => setInstruments([]));
-  }, [market, query]);
+  }, [market, query, selectInstrument, selected]);
 
   useEffect(() => {
-    loadPortfolio().catch(() => setHoldings([]));
-  }, []);
+    let cancelled = false;
+
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        loadPortfolio().catch(() => setHoldings([]));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loadPortfolio]);
 
   useEffect(() => {
     if (!selected) return undefined;
 
-    loadLivePrice(selected);
+    let cancelled = false;
+
+    Promise.resolve().then(() => {
+      if (!cancelled) {
+        loadLivePrice(selected);
+      }
+    });
+
     const timerId = window.setInterval(() => loadLivePrice(selected, false), 15000);
 
-    return () => window.clearInterval(timerId);
-  }, [selected?.symbol]);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timerId);
+    };
+  }, [loadLivePrice, selected]);
 
   const submitTrade = async (event) => {
     event.preventDefault();
