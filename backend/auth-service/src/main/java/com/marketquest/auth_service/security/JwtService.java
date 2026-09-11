@@ -9,15 +9,17 @@ import java.util.Date;
 
 @Service
 public class JwtService {
-    private final String secret = "marketquest-secret-key-must-be-at-least-32-chars";
-    private final SecretKey key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    private final SecretKey key;
+    public JwtService(@org.springframework.beans.factory.annotation.Value("${JWT_SECRET}") String secret) {
+        key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    }
 
     public String generateToken(String email) {
         return Jwts.builder()
                 .subject(email)
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 86400000))
-                .signWith(key)
+                .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
 }

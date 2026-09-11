@@ -10,7 +10,13 @@ if (Test-Path $pidDir) {
         $pidValue = Get-Content $_.FullName -ErrorAction SilentlyContinue
 
         if ($pidValue -and (Get-Process -Id $pidValue -ErrorAction SilentlyContinue)) {
-            Stop-Process -Id $pidValue -Force
+            # Terminate Maven and Java children as well as the launcher shell.
+            $launcher = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
+            if ($launcher.ProcessName -ne 'powershell') {
+                throw "PID $pidValue no longer belongs to a PowerShell launcher; refusing to stop it."
+            }
+            taskkill /PID $pidValue /T /F
+            if ($LASTEXITCODE -ne 0) { throw "Could not stop process tree for $name" }
             Write-Host "Stopped $name with PID $pidValue"
         } else {
             Write-Host "$name was not running"
@@ -22,5 +28,6 @@ if (Test-Path $pidDir) {
 
 Write-Host "Stopping Kafka and Zookeeper..."
 docker compose -f $composeFile down
+if ($LASTEXITCODE -ne 0) { throw 'Docker Compose could not stop the infrastructure.' }
 
 Write-Host "Dev services stopped."

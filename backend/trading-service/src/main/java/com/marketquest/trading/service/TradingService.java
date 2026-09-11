@@ -39,11 +39,11 @@ public class TradingService {
                 request.getSide().trim().toUpperCase(Locale.ROOT),
                 request.getQuantity(),
                 executionPrice,
-                normalizeCurrency(request.getCurrency()),
+                instrumentService.findBySymbol(request.getSymbol()).getCurrency(),
                 Instant.now());
 
         tradeEventProducer.publishTradeExecuted(event);
-        return new TradeResponse(tradeId, "EXECUTED", "Trade executed and published");
+        return new TradeResponse(tradeId, "PENDING", "Order accepted; portfolio will determine execution or rejection");
     }
 
     private void validate(TradeRequest request) {
@@ -66,15 +66,7 @@ public class TradingService {
         if (request.getQuantity() <= 0) {
             throw new IllegalArgumentException("quantity must be greater than zero");
         }
-        if (request.getPrice() == null || request.getPrice().signum() <= 0) {
-            throw new IllegalArgumentException("price must be greater than zero");
-        }
+        if (request.getQuantity() > 1000000) throw new IllegalArgumentException("quantity must not exceed 1000000");
     }
 
-    private String normalizeCurrency(String currency) {
-        if (currency == null || currency.isBlank()) {
-            return "INR";
-        }
-        return currency.trim().toUpperCase(Locale.ROOT);
-    }
 }

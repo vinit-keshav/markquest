@@ -20,6 +20,10 @@ public class DemoHolding {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @jakarta.persistence.Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
+
     @Column(name = "user_id", nullable = false)
     private String userId;
 
@@ -88,7 +92,8 @@ public class DemoHolding {
     public void buy(int buyQuantity, BigDecimal buyPrice) {
         BigDecimal existingCost = averagePrice.multiply(BigDecimal.valueOf(quantity));
         BigDecimal newCost = buyPrice.multiply(BigDecimal.valueOf(buyQuantity));
-        quantity += buyQuantity;
+        if (buyQuantity <= 0 || buyPrice == null || buyPrice.signum() <= 0) throw new IllegalArgumentException("Invalid buy quantity or price");
+        quantity = Math.addExact(quantity, buyQuantity);
         averagePrice = existingCost.add(newCost)
                 .divide(BigDecimal.valueOf(quantity), 4, RoundingMode.HALF_UP);
         currentPrice = buyPrice;
@@ -96,6 +101,7 @@ public class DemoHolding {
     }
 
     public void sell(int sellQuantity, BigDecimal sellPrice) {
+        if (sellQuantity <= 0 || sellQuantity > quantity || sellPrice == null || sellPrice.signum() <= 0) throw new IllegalArgumentException("Invalid sell quantity or price");
         BigDecimal profitLoss = sellPrice.subtract(averagePrice)
                 .multiply(BigDecimal.valueOf(sellQuantity));
         realizedProfitLoss = realizedProfitLoss.add(profitLoss);

@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSelector } from "react-redux";
+import { apiError } from "../api/session";
 import { Link } from "react-router-dom";
 import {
   depositDemoCashApi,
@@ -9,7 +11,7 @@ import {
   updateMarketPriceApi,
 } from "../api/tradingPlatformApi";
 
-const defaultUserId = "user1";
+
 const markets = [
   { label: "All", value: "" },
   { label: "NSE", value: "NSE" },
@@ -72,11 +74,13 @@ const ProfitLossChart = ({ data, currency }) => {
 };
 
 const TradingLab = () => {
-  const [userId, setUserId] = useState(defaultUserId);
+  const user = useSelector((state) => state.auth.user);
+  const userId = user?.email || user?.mobile || "";
   const [market, setMarket] = useState("");
   const [query, setQuery] = useState("");
   const [instruments, setInstruments] = useState([]);
   const [selected, setSelected] = useState(null);
+  const selectedSymbol = useRef(null);
   const [liveQuote, setLiveQuote] = useState(null);
   const [side, setSide] = useState("BUY");
   const [quantity, setQuantity] = useState("1");
@@ -102,9 +106,11 @@ const TradingLab = () => {
         investedValue: 0,
         currentValue: 0,
         totalProfitLoss: 0,
+        unrealizedProfitLoss: 0,
       };
       current.investedValue += Number(holding.investedValue || 0);
       current.currentValue += Number(holding.currentValue || 0);
+      current.unrealizedProfitLoss += Number(holding.unrealizedProfitLoss || 0);
       current.totalProfitLoss += Number(holding.totalProfitLoss || 0);
       byCurrency.set(currency, current);
     });
@@ -113,13 +119,12 @@ const TradingLab = () => {
 
   const realizedTotals = useMemo(() => {
     const byCurrency = new Map();
-    trades.forEach((trade) => {
-      if (trade.status !== "EXECUTED" || trade.side !== "SELL") return;
+    dailyProfitLoss.forEach((trade) => {
       const currency = trade.currency || "INR";
       byCurrency.set(currency, (byCurrency.get(currency) || 0) + Number(trade.profitLoss || 0));
     });
     return Array.from(byCurrency, ([currency, realizedProfitLoss]) => ({ currency, realizedProfitLoss }));
-  }, [trades]);
+  }, [dailyProfitLoss]);
 
   const loadPortfolio = useCallback(async (activeUserId = userId) => {
     const response = await getPortfolioSummaryApi(activeUserId.trim());
@@ -127,9 +132,11 @@ const TradingLab = () => {
     setHoldings(response.data.holdings || []);
     setTrades(response.data.trades || []);
     setDailyProfitLoss(response.data.dailyProfitLoss || []);
+    return response.data;
   }, [userId]);
 
   const selectInstrument = useCallback((instrument) => {
+    selectedSymbol.current = instrument.symbol;
     setSelected(instrument);
     setLiveQuote(null);
     setTradePrice(String(instrument.referencePrice));
@@ -143,6 +150,7 @@ const TradingLab = () => {
     if (showLoader) setPriceLoading(true);
     try {
       const response = await getLivePriceApi(instrument.symbol);
+      if (selectedSymbol.current !== instrument.symbol) return null;
       setLiveQuote(response.data);
       setTradePrice(String(response.data.price));
       return response.data;
@@ -168,7 +176,7 @@ const TradingLab = () => {
 
     Promise.resolve().then(() => {
       if (!cancelled) {
-        loadPortfolio().catch(() => setHoldings([]));
+        loadPortfolio().catch((err) => setError(apiError(err, "Portfolio could not be loaded")));
       }
     });
 
@@ -208,13 +216,11 @@ const TradingLab = () => {
       const quote = await loadLivePrice(selected, false);
       const executionPrice = Number(quote?.price || tradePrice || selected.referencePrice);
 
-      await executeTradeApi({
-        userId: userId.trim(),
+      const order = await executeTradeApi({
         symbol: selected.symbol,
         side,
         quantity: Number(quantity),
         price: executionPrice,
-        currency: selected.currency,
       });
 
       setMessage(
@@ -223,9 +229,19 @@ const TradingLab = () => {
           selected.currency
         )}. Check recent orders for final status.`
       );
-      setTimeout(() => loadPortfolio(userId), 700);
+      // Kafka settlement is asynchronous; wait for this order rather than guessing a delay.
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
+        const summary = await loadPortfolio(userId);
+        const settled = summary.trades?.find((trade) => trade.tradeId === order.data.tradeId);
+        if (settled) {
+          setMessage((settled.status === "EXECUTED" ? "Order executed: " : "Order rejected: ") + settled.message);
+          return;
+        }
+      }
+      setMessage("Order is still pending. Refresh the portfolio to check its final status; do not resubmit it.");
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data || "Trade failed");
+      setError(apiError(err, "Trade failed"));
     } finally {
       setLoading(false);
     }
@@ -246,10 +262,10 @@ const TradingLab = () => {
         currentPrice: marketPrice,
       });
       setHoldings(response.data);
-      loadPortfolio(userId);
+      await loadPortfolio(userId);
       setMessage(`Portfolio marked to ${formatMoney(marketPrice, selected.currency)} for ${selected.symbol}.`);
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data || "Price update failed");
+      setError(apiError(err, "Price update failed"));
     } finally {
       setLoading(false);
     }
@@ -273,7 +289,7 @@ const TradingLab = () => {
       setDailyProfitLoss(response.data.dailyProfitLoss || []);
       setMessage(`${formatMoney(depositAmount, depositCurrency)} added to buying power.`);
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data || "Could not add demo cash");
+      setError(apiError(err, "Could not add demo cash"));
     } finally {
       setLoading(false);
     }
@@ -287,7 +303,7 @@ const TradingLab = () => {
         <div>
           <p className="eyebrow">MarketQuest paper trading</p>
           <h1>Paper Trading Desk</h1>
-          <p>Test buy and sell decisions with demo cash while using the latest available market price.</p>
+          <p>Practice with virtual cash. Quotes use a provider when available, otherwise fixed demo reference prices.</p>
         </div>
         <div className="header-actions">
           <Link className="secondary-action" to="/dashboard">Dashboard</Link>
@@ -420,8 +436,8 @@ const TradingLab = () => {
             )}
 
             <label className="field-group">
-              <span>User ID</span>
-              <input value={userId} onChange={(event) => setUserId(event.target.value)} required />
+              <span>Signed-in account</span>
+              <input value={userId} readOnly />
             </label>
 
             <div className="side-toggle">
@@ -475,7 +491,7 @@ const TradingLab = () => {
         </div>
 
         <div className="pulse-stage">
-          <svg viewBox="0 0 360 160" role="img" aria-label="Animated market movement">
+          <svg viewBox="0 0 360 160" role="img" aria-label="Decorative illustration, not historical price data">
             <defs>
               <linearGradient id="pulseStroke" x1="0%" x2="100%" y1="0%" y2="0%">
                 <stop offset="0%" stopColor="#7dd3fc" />
@@ -500,8 +516,8 @@ const TradingLab = () => {
 
         <div className="market-metrics">
           <div>
-            <span>Signal</span>
-            <strong>{selected ? "Active" : "Waiting"}</strong>
+            <span>Illustration</span>
+            <strong>Decorative</strong>
           </div>
           <div>
             <span>Refresh</span>
@@ -513,7 +529,9 @@ const TradingLab = () => {
           </div>
         </div>
 
+        <p>Decorative chart — not market history. Portfolio prices update when you mark them to a quote.</p>
         <div className="price-actions">
+          <button className="secondary-action" type="button" onClick={() => loadPortfolio().catch((err) => setError(apiError(err, "Portfolio refresh failed")))}>Refresh portfolio</button>
           <button className="secondary-action" type="button" onClick={() => loadLivePrice()} disabled={priceLoading || !selected}>
             Refresh quote
           </button>
@@ -558,7 +576,7 @@ const TradingLab = () => {
             {totals.map((item) => (
               <div className={item.totalProfitLoss >= 0 ? "pl-stat gain" : "pl-stat loss"} key={`${item.currency}-open`}>
                 <span>{item.currency} open P/L</span>
-                <strong>{formatMoney(item.totalProfitLoss, item.currency)}</strong>
+                <strong>{formatMoney(item.unrealizedProfitLoss, item.currency)}</strong>
                 <small>Includes current holdings</small>
               </div>
             ))}

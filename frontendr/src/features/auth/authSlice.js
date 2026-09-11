@@ -53,11 +53,15 @@ export const resetPasswordUser = createAsyncThunk("auth/resetPassword", async (d
   }
 });
 
+const readUser = () => {
+  try { return JSON.parse(localStorage.getItem("user") || "null"); } catch { return null; }
+};
+
 const authSlice = createSlice({
   name: "auth",
   initialState: {
     token: localStorage.getItem("token") || null,
-    user: JSON.parse(localStorage.getItem("user") || "null"),
+    user: readUser(),
     loading: false,
     error: null,
   },

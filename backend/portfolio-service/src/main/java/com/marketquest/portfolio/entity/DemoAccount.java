@@ -19,6 +19,10 @@ public class DemoAccount {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @jakarta.persistence.Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
+
     @Column(name = "user_id", nullable = false)
     private String userId;
 

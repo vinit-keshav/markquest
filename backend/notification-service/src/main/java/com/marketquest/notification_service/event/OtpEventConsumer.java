@@ -12,7 +12,7 @@ public class OtpEventConsumer {
         this.otpEmailService = otpEmailService;
     }
 
-    @KafkaListener(topics = "${marketquest.kafka.topic.otp-requested}")
+    @KafkaListener(topics = "${marketquest.kafka.topic.otp-requested}", autoStartup = "${spring.kafka.listener.auto-startup:true}")
     public void consumeOtpRequestedEvent(OtpRequestedEvent event) {
         System.out.println("OTP event received for " + event.getIdentifier());
         otpEmailService.sendOtpEmail(event);

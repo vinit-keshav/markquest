@@ -12,7 +12,7 @@ public class TradeEventConsumer {
         this.portfolioService = portfolioService;
     }
 
-    @KafkaListener(topics = "${marketquest.kafka.topic.trade-executed}")
+    @KafkaListener(topics = "${marketquest.kafka.topic.trade-executed}", autoStartup = "${spring.kafka.listener.auto-startup:true}")
     public void consumeTradeExecuted(TradeExecutedEvent event) {
         portfolioService.applyTrade(event);
         System.out.println("Applied trade " + event.getTradeId() + " for " + event.getUserId());

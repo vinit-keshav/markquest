@@ -21,11 +21,14 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-
     @Column
     private String filename;
 
     private boolean verified =false;
+
+    private int otpAttempts;
+    public int getOtpAttempts() { return otpAttempts; }
+    public void setOtpAttempts(int attempts) { this.otpAttempts = attempts; }
 
     private String otpCode;
 
@@ -43,7 +46,7 @@ public class User {
     public void setMobile(String mobile) { this.mobile = mobile; }
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
-    public boolean isVerified() { return verified;}
+    public boolean isVerified() { return verified; }
     public void setVerified(boolean verified) {this.verified = verified;}
     public String getOtpCode() { return otpCode; }
     public void setOtpCode(String otpCode) { this.otpCode = otpCode; }

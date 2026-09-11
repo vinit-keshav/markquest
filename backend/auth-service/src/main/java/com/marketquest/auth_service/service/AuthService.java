@@ -8,17 +8,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import java.util.List;
 import java.time.LocalDateTime;
-import java.util.Random;
+import java.security.SecureRandom;
+import java.util.UUID;
+import java.util.Locale;
+import javax.imageio.ImageIO;
 import org.springframework.web.multipart.MultipartFile;
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 
 @Service
 
 public class AuthService{
+    private static final SecureRandom RANDOM = new SecureRandom();
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
@@ -38,50 +40,53 @@ public class AuthService{
     }
   
   public String signup(SignupRequest request, MultipartFile file) {
+    if (request.getName() == null || request.getName().isBlank() || request.getName().length() > 100) throw new IllegalArgumentException("Name is required (max 100 characters)");
+    if (request.getPassword() == null || request.getPassword().length() < 8 || request.getPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) throw new IllegalArgumentException("Password must be at least 8 characters and at most 72 bytes");
+    if (request.getEmail() == null || !request.getEmail().trim().matches("[^\\s@]+@[^\\s@]+[.][^\\s@]+")) throw new IllegalArgumentException("A valid email is required; SMS delivery is not implemented");
+    request.setEmail(request.getEmail().trim().toLowerCase(Locale.ROOT));
+    request.setName(request.getName().trim());
     boolean emailMissing = request.getEmail() == null || request.getEmail().isBlank();
     boolean mobileMissing = request.getMobile() == null || request.getMobile().isBlank();
     if (emailMissing && mobileMissing) {
-            throw new RuntimeException("Email or mobile number is required");
+            throw new IllegalArgumentException("Email or mobile number is required");
         }
-    if (file==null || file.isEmpty()) {
-      throw new RuntimeException("File is required");
-    }
+
 
         if (!emailMissing) {
             var existingUser = userRepository.findByEmail(request.getEmail());
             if (existingUser.isPresent()) {
                 if (existingUser.get().isVerified()) {
-                    throw new RuntimeException("Email already in use");
+                    throw new IllegalArgumentException("Email already in use");
                 }
                 return resendOtp(existingUser.get());
             }
         }
-
         if (!mobileMissing) {
             var existingUser = userRepository.findByMobile(request.getMobile());
             if (existingUser.isPresent()) {
                 if (existingUser.get().isVerified()) {
-                    throw new RuntimeException("Mobile number already in use");
+                    throw new IllegalArgumentException("Mobile number already in use");
                 }
                 return resendOtp(existingUser.get());
             }
         }
 
         try{
-          String uploadDir = "uploads/";
-
-          File folder = new File(uploadDir);
-          if(!folder.exists()) {
-            folder.mkdirs();
+          String fileName = null;
+          if (file != null && !file.isEmpty()) {
+              if (file.getSize() > 2 * 1024 * 1024) throw new IllegalArgumentException("Profile image must be at most 2 MB");
+              String type = file.getContentType();
+              if (!"image/jpeg".equals(type) && !"image/png".equals(type)) throw new IllegalArgumentException("Use a JPEG or PNG profile image");
+              java.awt.image.BufferedImage image;
+              try (var input = file.getInputStream()) { image = ImageIO.read(input); }
+              if (image == null || image.getWidth() > 4096 || image.getHeight() > 4096) throw new IllegalArgumentException("Invalid profile image or dimensions above 4096 pixels");
+              Path uploadRoot = Paths.get("uploads").toAbsolutePath().normalize();
+              Files.createDirectories(uploadRoot);
+              String format = "image/png".equals(type) ? "png" : "jpg";
+              fileName = UUID.randomUUID() + "." + format;
+              ImageIO.write(image, format, uploadRoot.resolve(fileName).toFile());
           }
 
-          String originalFileName = file.getOriginalFilename();
-          String fileName = System.currentTimeMillis() + "_" + originalFileName;
-
-          Path filePath = Paths.get(uploadDir + fileName);
-          Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-
-        
      String otp = generateOtp();
 
      User user = new User();
@@ -95,10 +100,10 @@ public class AuthService{
      user.setFilename(fileName);
      userRepository.save(user);
      otpEventProducer.publishOtpRequested(getUserIdentifier(user), otp, "SIGNUP");
-     return "OTP sent successfully";
+     return "OTP queued for email delivery";
   }
-  catch(Exception e) {
-     throw new RuntimeException("Data save failed" + e.getMessage());
+  catch(java.io.IOException e) {
+     throw new IllegalStateException("Profile image could not be saved", e);
   }
 }
 
@@ -106,30 +111,35 @@ public class AuthService{
     User user = findByIdentifier(identifier);
 
     if (user.isVerified()) {
-        throw new RuntimeException("Account is already verified");
+        throw new IllegalArgumentException("Account is already verified");
     }
 
     return resendOtp(user);
   }
 
   private String resendOtp(User user) {
+    if (user.getOtpExpiresAt() != null && user.getOtpExpiresAt().minusMinutes(10).plusSeconds(60).isAfter(LocalDateTime.now())) throw new IllegalArgumentException("Wait 60 seconds before requesting another OTP");
+    user.setOtpAttempts(0);
     String otp = generateOtp();
     user.setOtpCode(otp);
     user.setOtpExpiresAt(LocalDateTime.now().plusMinutes(10));
     userRepository.save(user);
     otpEventProducer.publishOtpRequested(getUserIdentifier(user), otp, "RESEND");
-    return "OTP resent successfully";
+    return "OTP queued for email delivery";
   }
 
 public String verifyOtp(VerifyOtpRequest request){
    User user = findByIdentifier(request.getIdentifier());
 
+   if (user.getOtpAttempts() >= 5) throw new IllegalArgumentException("Too many attempts. Request a new OTP");
    if(user.getOtpCode() == null || !user.getOtpCode().equals(request.getOtp())){
-    throw new RuntimeException("Invalid OTP");
+    user.setOtpAttempts(user.getOtpAttempts() + 1);
+    userRepository.save(user);
+    throw new IllegalArgumentException("Invalid OTP");
    }
 
            if (user.getOtpExpiresAt() == null || user.getOtpExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("OTP expired");
+            throw new IllegalArgumentException("OTP expired");
         }
 
         user.setVerified(true);
@@ -144,12 +154,12 @@ public String verifyOtp(VerifyOtpRequest request){
     User user = findByIdentifier(getLoginIdentifier(request));
   
             if (!user.isVerified()) {
-            throw new RuntimeException("Please verify OTP before login");
+            throw new IllegalArgumentException("Please verify OTP before login");
         }
 
 
         if(!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
+            throw new IllegalArgumentException("Invalid credentials");
         }
 
 
@@ -168,11 +178,11 @@ public String verifyOtp(VerifyOtpRequest request){
     User user = findByIdentifier(request.getIdentifier());
 
     if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
-        throw new RuntimeException("Current password is incorrect");
+        throw new IllegalArgumentException("Current password is incorrect");
     }
 
-    if (request.getNewPassword() == null || request.getNewPassword().length() < 6) {
-        throw new RuntimeException("New password must be at least 6 characters");
+    if (request.getNewPassword() == null || request.getNewPassword().length() < 8 || request.getNewPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 72) {
+        throw new IllegalArgumentException("New password must be at least 8 characters and at most 72 bytes");
     }
 
     user.setPassword(passwordEncoder.encode(request.getNewPassword()));
@@ -182,16 +192,19 @@ public String verifyOtp(VerifyOtpRequest request){
 
   private User findByIdentifier(String identifier) {
     if (identifier == null || identifier.isBlank()) {
-        throw new RuntimeException("Email or mobile number is required");
+        throw new IllegalArgumentException("Email or mobile number is required");
     }
 
-    return userRepository.findByEmail(identifier)
-    .or(() -> userRepository.findByMobile(identifier))
-    .orElseThrow(() -> new RuntimeException("User not found"));
+    String normalized = identifier.trim();
+    if (normalized.contains("@")) normalized = normalized.toLowerCase(Locale.ROOT);
+    final String lookup = normalized;
+    return userRepository.findByEmail(lookup)
+    .or(() -> userRepository.findByMobile(lookup))
+    .orElseThrow(() -> new IllegalArgumentException("User not found"));
   }
 
   private String generateOtp() {
-    return String.valueOf(new Random().nextInt(900000) + 100000);
+    return String.valueOf(RANDOM.nextInt(900000) + 100000);
   }
 
   private String getLoginIdentifier(LoginRequest request) {

@@ -10,7 +10,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/watchlist")
-@CrossOrigin(origins = "*")
 public class WatchlistController {
     private final WatchlistService watchlistService;
 
@@ -19,18 +18,18 @@ public class WatchlistController {
     }
 
     @PostMapping({"", "/saveWatchlist"})
-    public WatchlistItem watchlistPost(@RequestBody WatchlistRequest request) {
-        return watchlistService.postWatchlist(request);
+    public WatchlistItem watchlistPost(@RequestBody WatchlistRequest request, java.security.Principal principal) {
+        return watchlistService.postWatchlist(principal.getName(), request);
     }
 
     @GetMapping({"", "/getWatchlist"})
-    public List<WatchlistItem> watchListGet() {
-        return watchlistService.getWatchlist();
+    public List<WatchlistItem> watchListGet(java.security.Principal principal) {
+        return watchlistService.getWatchlist(principal.getName());
     }
 
     @PutMapping({"/{id}", "/updateWatchlist/{id}"})
-    public WatchlistItem watchlistPut(@PathVariable Long id, @RequestBody WatchlistRequest request) {
-        return watchlistService.updateWatchlist(id, request);
+    public WatchlistItem watchlistPut(@PathVariable Long id, @RequestBody WatchlistRequest request, java.security.Principal principal) {
+        return watchlistService.updateWatchlist(principal.getName(), id, request);
     }
 
 }

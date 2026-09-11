@@ -18,6 +18,13 @@ public class OtpEventProducer {
 
     public void publishOtpRequested(String identifier, String otp, String purpose) {
         OtpRequestedEvent event = new OtpRequestedEvent(identifier, otp, purpose);
-        kafkaTemplate.send(otpRequestedTopic, identifier, event);
+        try {
+            kafkaTemplate.send(otpRequestedTopic, identifier, event).get(10, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Message submission interrupted", ex);
+        } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException ex) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Message broker unavailable; submission could not be confirmed", ex);
+        }
     }
 }

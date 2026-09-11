@@ -3,11 +3,16 @@ package com.marketquest.watchlist_service.entity;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "watchlist_items")
+@Table(name = "watchlist_items", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "symbol"}))
 public class WatchlistItem {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "user_id")
+    private String userId;
+    public String getUserId() { return userId; }
+    public void setUserId(String userId) { this.userId = userId; }
 
     private String symbol;
     private String companyName;

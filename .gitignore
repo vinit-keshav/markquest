@@ -48,3 +48,5 @@ docker-compose.override.yml
 
 # Uploaded/generated docs you do not want in repo
 ~$*.docx
+# Private profile uploads
+**/uploads/

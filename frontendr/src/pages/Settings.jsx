@@ -59,7 +59,7 @@ function Settings() {
             <span>New password</span>
             <input
               type="password"
-              minLength={6}
+              minLength={8}
               value={form.newPassword}
               onChange={(event) => setForm((current) => ({ ...current, newPassword: event.target.value }))}
               required

@@ -166,6 +166,10 @@ public class PortfolioService {
                 .findByUserIdAndSymbol(userId, symbol)
                 .orElseGet(() -> new DemoHolding(userId, symbol, currency));
 
+        if (!holding.getCurrency().equals(currency)) {
+            saveTrade(event, symbol, "BUY", currency, "REJECTED", BigDecimal.ZERO, "Currency does not match holding");
+            return;
+        }
         account.setCashBalance(account.getCashBalance().subtract(tradeValue));
         holding.buy(quantity, price);
 
@@ -190,6 +194,10 @@ public class PortfolioService {
             return;
         }
 
+        if (!holding.getCurrency().equals(currency)) {
+            saveTrade(event, symbol, "SELL", currency, "REJECTED", BigDecimal.ZERO, "Currency does not match holding");
+            return;
+        }
         DemoAccount account = getAccount(userId, currency);
         BigDecimal tradeValue = price.multiply(BigDecimal.valueOf(quantity));
         BigDecimal profitLoss = price.subtract(holding.getAveragePrice()).multiply(BigDecimal.valueOf(quantity));
@@ -245,7 +253,7 @@ public class PortfolioService {
     }
 
     private List<DailyProfitLossResponse> getDailyProfitLoss(String userId) {
-        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneId.systemDefault());
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE.withZone(ZoneId.of("Asia/Kolkata"));
         Map<String, BigDecimal> totals = new LinkedHashMap<>();
 
         tradeRepository.findByUserIdAndStatusOrderByExecutedAtAsc(userId, "EXECUTED")
@@ -288,7 +296,9 @@ public class PortfolioService {
         if (currency == null || currency.isBlank()) {
             return "INR";
         }
-        return currency.trim().toUpperCase(Locale.ROOT);
+        String normalized = currency.trim().toUpperCase(Locale.ROOT);
+        if (!normalized.equals("INR") && !normalized.equals("USD")) throw new IllegalArgumentException("Currency must be INR or USD");
+        return normalized;
     }
 
     private String required(String value, String fieldName) {

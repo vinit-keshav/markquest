@@ -58,6 +58,8 @@ const watchlistSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
+      .addCase("auth/logout", (state) => { state.items = []; state.error = null; state.loading = false; })
+      .addCase("auth/login/fulfilled", (state) => { state.items = []; state.error = null; })
       .addCase(fetchWatchlist.pending, (state) => {
         state.loading = true;
         state.error = null;

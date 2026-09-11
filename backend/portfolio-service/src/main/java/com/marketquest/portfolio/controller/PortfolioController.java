@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@CrossOrigin(origins = "http://localhost:5173")
 @RestController
 @RequestMapping("/api/portfolio")
 public class PortfolioController {
@@ -25,26 +24,33 @@ public class PortfolioController {
     }
 
     @GetMapping("/{userId}")
-    public List<HoldingResponse> getHoldings(@PathVariable String userId) {
+    public List<HoldingResponse> getHoldings(@PathVariable String userId, java.security.Principal principal) {
+        requireOwner(userId, principal);
         return portfolioService.getHoldings(userId);
     }
 
     @GetMapping("/{userId}/summary")
-    public PortfolioSummaryResponse getSummary(@PathVariable String userId) {
+    public PortfolioSummaryResponse getSummary(@PathVariable String userId, java.security.Principal principal) {
+        requireOwner(userId, principal);
         return portfolioService.getSummary(userId);
     }
 
     @PostMapping("/{userId}/deposit")
     public PortfolioSummaryResponse depositCash(
-            @PathVariable String userId,
+            @PathVariable String userId, java.security.Principal principal,
             @RequestBody DepositRequest request) {
+        requireOwner(userId, principal);
         return portfolioService.depositCash(userId, request.getCurrency(), request.getAmount());
     }
 
     @PostMapping("/{userId}/prices")
     public List<HoldingResponse> updateCurrentPrice(
-            @PathVariable String userId,
+            @PathVariable String userId, java.security.Principal principal,
             @RequestBody PriceUpdateRequest request) {
+        requireOwner(userId, principal);
         return portfolioService.updateCurrentPrice(userId, request.getSymbol(), request.getCurrentPrice());
+    }
+    private void requireOwner(String userId, java.security.Principal principal) {
+        if (!principal.getName().equals(userId)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN, "This portfolio belongs to another account");
     }
 }

@@ -15,7 +15,6 @@ import java.nio.file.Paths;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
 public class AuthController {
    private final AuthService authService;
 
@@ -24,7 +23,7 @@ public class AuthController {
    } 
 
    @PostMapping(value="/signup",consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-   public String signup(@RequestPart("request") SignupRequest request, @RequestPart("file") MultipartFile file) {
+   public String signup(@RequestPart("request") SignupRequest request, @RequestPart(value = "file", required = false) MultipartFile file) {
       return authService.signup(request, file);
    }
 
@@ -38,14 +37,14 @@ public class AuthController {
       return authService.resendOtp(request.getIdentifier());
    }
 
-
    @PostMapping("/login")
    public List<AuthResponse> login(@RequestBody LoginRequest request){
         return authService.login(request);
    }
 
    @PostMapping("/reset-password")
-   public String resetPassword(@RequestBody PasswordResetRequest request) {
+   public String resetPassword(@RequestBody PasswordResetRequest request, java.security.Principal principal) {
+      request.setIdentifier(principal.getName());
       return authService.resetPassword(request);
    }
 

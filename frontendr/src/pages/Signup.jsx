@@ -30,7 +30,7 @@ const Signup = () => {
       "request",
       new Blob([JSON.stringify(signupPayload)], { type: "application/json" }),
     );
-    formData.append("file", file);
+    if (file) formData.append("file", file);
     const result = await dispatch(signupUser(formData));
     if (signupUser.fulfilled.match(result)) {
       navigate("/verify-otp", { state: { identifier } });
@@ -69,11 +69,11 @@ const Signup = () => {
           </label>
 
           <label className="field-group">
-            <span>Email or mobile</span>
+            <span>Email for OTP delivery</span>
             <input
               name="identifier"
-              type="text"
-              placeholder="you@example.com or 9876543210"
+              type="email"
+              placeholder="you@example.com"
               autoComplete="username"
               value={form.identifier}
               onChange={handleChange}
@@ -88,18 +88,18 @@ const Signup = () => {
               type="password"
               placeholder="Create a password"
               autoComplete="new-password"
+              minLength={8}
               onChange={handleChange}
               required
             />
           </label>
           <label className="field-group">
-            <span>Profile image</span>
+            <span>Profile image (optional, JPEG/PNG, max 2 MB)</span>
             <input
               name="file"
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
-              required
             />
           </label>
           <button className="primary-action" type="submit" disabled={loading}>
