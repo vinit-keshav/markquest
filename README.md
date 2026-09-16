@@ -85,3 +85,7 @@ From each implemented backend service folder, run `mvn test`. Tests use H2 for d
 In `frontendr`, run `npm run lint` and `npm run build`. GitHub workflows run the backend tests and frontend lint/build.
 
 See [the review and interview guide](docs/interview-readiness.md) for demo steps and remaining limitations.
+
+## Deployment
+
+See [deployment preparation](docs/deployment.md) for container builds and the manual GitHub Container Registry release workflow. Live deployment still requires a hosting destination, server secrets, HTTPS and persistent storage.
