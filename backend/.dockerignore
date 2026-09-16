@@ -1,0 +1,6 @@
+**/target
+**/uploads
+**/.env*
+**/application-local.*
+**/application-dev.*
+**/.git
