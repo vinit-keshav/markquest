@@ -1,0 +1,151 @@
+name: marketquest
+
+x-java-env: &java-env
+  JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET}
+  CORS_ALLOWED_ORIGINS: ${APP_ORIGIN:?Set APP_ORIGIN}
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  SPRING_JPA_SHOW_SQL: "false"
+  JAVA_TOOL_OPTIONS: -Xms64m -Xmx384m
+
+x-java: &java
+  restart: unless-stopped
+  mem_limit: 640m
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "3"
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: marketquest
+      MYSQL_USER: marketquest_user
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$$MYSQL_PASSWORD" mysql -h 127.0.0.1 -u "$$MYSQL_USER" -D marketquest -e "SELECT 1" >/dev/null 2>&1']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.1
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: [CMD-SHELL, 'kafka-topics --bootstrap-server kafka:9092 --list >/dev/null 2>&1']
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  auth-service:
+    <<: *java
+    image: ghcr.io/vinit-keshav/markquest/auth-service:${IMAGE_TAG:-6bfec16dab240b80f946b13870c771a09a328109}
+    environment:
+      <<: *java-env
+      AUTH_DB_URL: jdbc:mysql://mysql:3306/marketquest
+      AUTH_DB_USERNAME: marketquest_user
+      AUTH_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    volumes:
+      - auth-uploads:/app/uploads
+    depends_on:
+      mysql: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+
+  watchlist-service:
+    <<: *java
+    image: ghcr.io/vinit-keshav/markquest/watchlist-service:${IMAGE_TAG:-6bfec16dab240b80f946b13870c771a09a328109}
+    environment:
+      <<: *java-env
+      WATCHLIST_DB_URL: jdbc:mysql://mysql:3306/marketquest
+      WATCHLIST_DB_USERNAME: marketquest_user
+      WATCHLIST_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    depends_on:
+      mysql: {condition: service_healthy}
+
+  portfolio-service:
+    <<: *java
+    image: ghcr.io/vinit-keshav/markquest/portfolio-service:${IMAGE_TAG:-6bfec16dab240b80f946b13870c771a09a328109}
+    environment:
+      <<: *java-env
+      PORTFOLIO_DB_URL: jdbc:mysql://mysql:3306/marketquest
+      PORTFOLIO_DB_USERNAME: marketquest_user
+      PORTFOLIO_DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+    depends_on:
+      mysql: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+
+  trading-service:
+    <<: *java
+    image: ghcr.io/vinit-keshav/markquest/trading-service:${IMAGE_TAG:-6bfec16dab240b80f946b13870c771a09a328109}
+    environment:
+      <<: *java-env
+      FINNHUB_TOKEN: ${FINNHUB_TOKEN:-}
+    depends_on:
+      kafka: {condition: service_healthy}
+
+  notification-service:
+    <<: *java
+    image: ghcr.io/vinit-keshav/markquest/notification-service:${IMAGE_TAG:-6bfec16dab240b80f946b13870c771a09a328109}
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JAVA_TOOL_OPTIONS: -Xms64m -Xmx256m
+      SMTP_HOST: ${SMTP_HOST:?Set SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:?Set SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?Set SMTP_PASSWORD}
+      SMTP_AUTH: "true"
+      SMTP_STARTTLS_ENABLE: "true"
+      OTP_EMAIL_FROM: ${SMTP_USERNAME:?Set SMTP_USERNAME}
+    depends_on:
+      kafka: {condition: service_healthy}
+
+  frontend:
+    image: ghcr.io/vinit-keshav/markquest/frontend:${IMAGE_TAG:-6bfec16dab240b80f946b13870c771a09a328109}
+    restart: unless-stopped
+    # Bind locally until the HTTPS reverse proxy is configured on the VPS.
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      - auth-service
+      - watchlist-service
+      - trading-service
+      - portfolio-service
+
+volumes:
+  mysql-data:
+  kafka-data:
+  zookeeper-data:
+  zookeeper-log:
+  auth-uploads:

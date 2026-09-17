@@ -1,5 +1,28 @@
 # Deployment preparation
 
+## VPS Compose file
+
+`backend/docker-compose.deploy.yml` runs the six published images from `ghcr.io/vinit-keshav/markquest`, plus MySQL, Kafka and Zookeeper. It uses the supplied release SHA by default; it does not rebuild application images. `backend/docker-compose.yml` remains the local Kafka/Zookeeper setup.
+
+On the VPS, from the `backend` directory:
+
+```bash
+cp .env.deploy.example .env.deploy
+chmod 600 .env.deploy
+nano .env.deploy
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml config --quiet
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml pull
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml up -d
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml ps
+docker compose --env-file .env.deploy -f docker-compose.deploy.yml logs --tail=100
+```
+
+Fill every empty required setting with private values. Use distinct strong database passwords and a random JWT secret of at least 32 bytes. Gmail requires an app password for SMTP. This demo uses one fresh shared MySQL schema; existing laptop data is not imported. MySQL initialization settings apply only to a new data volume: changing the password in the env file later does not change existing database accounts.
+
+Application processes starting is not proof of readiness; verify logs and rehearse signup, email delivery and settlement. Auth uploads use a named volume, initialized from the image's writable uploads directory. Do not run `down -v`: that deletes the database, broker data and profile images. Back up data before upgrading; changing IMAGE_TAG and rerunning pull/up replaces code, not schema changes already applied by Hibernate.
+
+The frontend listens only on `127.0.0.1:8080` on the VPS. Configure an HTTPS reverse proxy to this address before public use. For private testing, use an SSH tunnel (`ssh -L 8080:127.0.0.1:8080 deploy@SERVER_IP`) and temporarily set APP_ORIGIN to `http://localhost:8080`. No database, broker or individual backend ports are published. HTTPS and automatic CD rollout still need server/domain configuration.
+
 The container build definitions and manual **Build release images** workflow prepare releases for the five implemented backend services and `frontendr`. They do not yet deploy to a running host.
 
 Each backend image runs `mvn verify`; the frontend image runs tests, lint and build. An unsuccessful build is not published. Images are tagged with their source commit SHA in GitHub Container Registry. All six jobs must succeed before treating the commit as a complete release. Do not use a partial release.
